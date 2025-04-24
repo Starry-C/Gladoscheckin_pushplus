@@ -3,14 +3,12 @@ name: Auto Check
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
     paths-ignore:
       - 'README.md'
       - 'imgs/'
   schedule:
-    - cron: '0  0,12 * * *'
-  watch:
-    types: started
+    - cron: '0 0,12 * * *'
 
 jobs:
   build:
@@ -23,25 +21,28 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+    - name: 设置 Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: 安装依赖
       run: |
         python -m pip install --upgrade pip
         pip install requests
-    - name: running checnIn
+
+    - name: 运行 checkIn
       run: |
         python checkin.py
       env:
         PUSHPLUS: ${{ secrets.PUSHPLUS }}
         COOKIES: ${{ secrets.COOKIES }}
 
-    - name: keep alive
-      uses: gautamkrishnar/keepalive-workflow@v1 # using the workflow with default settings
-    - name: Delete workflow runs
+    - name: 保持工作流运行
+      run: |
+        while true; do echo "保持工作流运行中"; sleep 600; done &
+
+    - name: 删除工作流运行记录
       uses: Mattraks/delete-workflow-runs@v2
       with:
         token: ${{ github.token }}
