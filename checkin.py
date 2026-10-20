@@ -19,13 +19,16 @@ DOMAINS = [
     "glados.vip",
     "glados-facility.com",
 ]
+import os
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
+USER_AGENT = os.getenv("GLADOS_USER_AGENT", "").strip()
 
+if not USER_AGENT:
+    USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
 
 # ============================================================
 # Cookie
