@@ -31,12 +31,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
 
+   
     - name: 运行 checkIn
       run: |
         python checkin.py
       env:
         PUSHPLUS: ${{ secrets.PUSHPLUS }}
         COOKIES: ${{ secrets.COOKIES }}
+        GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
 
     - name: 保持工作流运行
       run: |
