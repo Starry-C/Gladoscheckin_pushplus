@@ -23,6 +23,8 @@ import os
 
 USER_AGENT = os.getenv("GLADOS_USER_AGENT", "").strip()
 
+print(f"当前使用的 User-Agent: {USER_AGENT}")
+
 if not USER_AGENT:
     USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
