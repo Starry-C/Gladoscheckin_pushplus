@@ -274,8 +274,8 @@ def serverchan(title, content):
     import html
 
     sendkey = os.environ.get(
-    "SERVERCHAN_SENDKEY",
-    ""
+       "SERVERCHAN_SENDKEY",
+       ""
 ).strip()
 
 print(
