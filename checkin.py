@@ -269,25 +269,26 @@ def checkin(domain, cookie):
 # 方糖（Server酱）推送
 # ============================================================
 
+
 def serverchan(title, content):
     import re
     import html
 
     sendkey = os.environ.get(
-       "SERVERCHAN_SENDKEY",
-       ""
-).strip()
+        "SERVERCHAN_SENDKEY",
+        ""
+    ).strip()
 
     print(
         "方糖密钥读取状态：",
         "已读取" if sendkey else "未读取"
-)
+    )
 
-if not sendkey:
-    print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
-    return
+    if not sendkey:
+        print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
+        return
 
-    # Server酱正文支持 Markdown，将原来的 HTML 转成纯文本
+    # 将 HTML 标签转换为纯文本
     content = re.sub(
         r"<br\s*/?>", "\n", content, flags=re.IGNORECASE
     )
@@ -342,7 +343,6 @@ if not sendkey:
 
     except requests.RequestException as e:
         print("❌ 方糖请求失败:", repr(e))
-
 
 # ============================================================
 # 主程序：自动签到并推送结果
