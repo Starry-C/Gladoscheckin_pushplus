@@ -278,9 +278,9 @@ def serverchan(title, content):
        ""
 ).strip()
 
-print(
-    "方糖密钥读取状态：",
-    "已读取" if sendkey else "未读取"
+    print(
+        "方糖密钥读取状态：",
+        "已读取" if sendkey else "未读取"
 )
 
 if not sendkey:
