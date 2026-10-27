@@ -264,215 +264,133 @@ def checkin(domain, cookie):
     return False, message or f"签到失败，code={code}"
 
 
+
 # ============================================================
-# PushPlus
+# 方糖（Server酱）推送
 # ============================================================
 
-def pushplus(title, content):
+def serverchan(title, content):
+    import re
+    import html
 
-    token = os.environ.get(
-        "PUSHPLUS",
+    sendkey = os.environ.get(
+        "SERVERCHAN_SENDKEY",
         ""
     ).strip()
 
-    if not token:
-        print("ℹ️ 未配置 PUSHPLUS，跳过推送")
+    if not sendkey:
+        print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
         return
 
-    url = "https://www.pushplus.plus/send"
+    # Server酱正文支持 Markdown，将原来的 HTML 转成纯文本
+    content = re.sub(
+        r"<br\s*/?>", "\n", content, flags=re.IGNORECASE
+    )
+    content = re.sub(
+        r"</p\s*>", "\n\n", content, flags=re.IGNORECASE
+    )
+    content = re.sub(
+        r"<[^>]+>", "", content
+    )
+    content = html.unescape(content).strip()
+
+    # 兼容 Server酱 Turbo（SCT）和 Server酱³（SC3）
+    if sendkey.startswith("sctp"):
+        match = re.match(r"^sctp(\d+)t", sendkey)
+        if not match:
+            print("❌ Server酱 SendKey 格式不正确")
+            return
+
+        uid = match.group(1)
+        url = f"https://{uid}.push.ft07.com/send/{sendkey}.send"
+    else:
+        url = f"https://sctapi.ftqq.com/{sendkey}.send"
 
     data = {
-        "token": token,
         "title": title,
-        "content": content,
-        "template": "html",
+        "desp": content,
     }
 
     try:
-
         response = requests.post(
             url,
-            json=data,
+            data=data,
             timeout=30
         )
 
-        print(
-            "PushPlus HTTP:",
-            response.status_code
-        )
+        print("方糖 HTTP:", response.status_code)
 
-        print(
-            "PushPlus:",
-            response.text[:500]
-        )
+        try:
+            result = response.json()
+            print(
+                "方糖推送结果:",
+                result.get("message", result.get("code", "未知"))
+            )
+
+            if response.ok and str(result.get("code")) == "0":
+                print("✅ 方糖推送成功")
+            else:
+                print("❌ 方糖推送未确认成功，请检查返回结果")
+
+        except ValueError:
+            print("❌ 方糖返回的不是有效 JSON")
 
     except requests.RequestException as e:
-
-        print(
-            "❌ PushPlus 请求失败:",
-            repr(e)
-        )
+        print("❌ 方糖请求失败:", repr(e))
 
 
 # ============================================================
-# 主程序
+# 主程序：自动签到并推送结果
 # ============================================================
 
 def main():
-
-    print("=" * 60)
-    print("🚀 GLaDOS 自动签到")
-    print(
-        datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-    )
-    print("=" * 60)
-
     cookies = get_cookies()
 
     if not cookies:
-        return 1
+        return
 
     success = 0
     fail = 0
-
     messages = []
 
-    for index, cookie in enumerate(
-        cookies,
-        start=1
-    ):
+    for index, cookie in enumerate(cookies, start=1):
+        print(f"\n========== 账号 {index} ==========")
 
-        print("\n")
-        print("=" * 60)
-        print(f"👤 处理账号 {index}/{len(cookies)}")
-        print("=" * 60)
-
-        # ----------------------------------------------------
-        # 1. 找到 Cookie 实际有效域名
-        # ----------------------------------------------------
-
-        domain, status_result = (
-            find_valid_domain(cookie)
-        )
+        domain, status = find_valid_domain(cookie)
 
         if not domain:
-
             fail += 1
-
             messages.append(
-                f"账号 {index}: "
-                f"❌ Cookie 无法找到有效域名"
+                f"账号 {index}：未找到有效登录域名，签到失败。"
             )
-
             continue
 
-        # ----------------------------------------------------
-        # 2. 签到
-        # ----------------------------------------------------
+        data = status.get("data", {})
+        email = data.get("email", f"账号 {index}")
+        left_days = data.get("leftDays", "未知")
 
-        ok, message = checkin(
-            domain,
-            cookie
-        )
-
-        # ----------------------------------------------------
-        # 3. 再获取一次状态
-        # ----------------------------------------------------
-
-        status = get_status(
-            domain,
-            cookie
-        )
-
-        email = "未知"
-
-        left_days = "未知"
-
-        if status:
-
-            data = status.get(
-                "data",
-                {}
-            )
-
-            if isinstance(data, dict):
-
-                email = data.get(
-                    "email",
-                    "未知"
-                )
-
-                left_days = data.get(
-                    "leftDays",
-                    "未知"
-                )
+        ok, message = checkin(domain, cookie)
 
         if ok:
-
             success += 1
-
-            print(
-                f"\n✅ 账号 {index} 签到成功"
-            )
-
             messages.append(
-                f"""
-                <p>
-                <b>账号：</b>{email}<br>
-                <b>域名：</b>{domain}<br>
-                <b>签到：</b>✅ {message}<br>
-                <b>剩余：</b>{left_days} 天
-                </p>
-                """
+                f"账号：{email}\n域名：{domain}\n签到：成功（{message}）\n剩余：{left_days} 天"
             )
-
         else:
-
             fail += 1
-
-            print(
-                f"\n❌ 账号 {index} 签到失败"
-            )
-
             messages.append(
-                f"""
-                <p>
-                <b>账号：</b>{email}<br>
-                <b>域名：</b>{domain}<br>
-                <b>签到：</b>❌ {message}<br>
-                <b>剩余：</b>{left_days} 天
-                </p>
-                """
+                f"账号：{email}\n域名：{domain}\n签到：失败（{message}）"
             )
 
-    # ========================================================
-    # 推送
-    # ========================================================
+    title = f"GLaDOS签到：成功 {success}，失败 {fail}"
+    content = "\n\n".join(messages)
 
-    content = "".join(messages)
+    print("\n========== 签到汇总 ==========")
+    print(content)
 
-    title = (
-        f"GLaDOS签到："
-        f"成功 {success}，失败 {fail}"
-    )
-
-    pushplus(
-        title,
-        content
-    )
-
-    print("\n" + "=" * 60)
-    print(
-        f"🏁 完成：成功 {success} / "
-        f"{len(cookies)}"
-    )
-    print("=" * 60)
-
-    # 全部成功才让 Actions 为成功
-    return 0 if fail == 0 else 1
+    serverchan(title, content)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
+
