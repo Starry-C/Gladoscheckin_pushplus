@@ -35,11 +35,12 @@ jobs:
     - name: 运行 checkIn
       run: |
         python checkin.py
-      env:
-        PUSHPLUS: ${{ secrets.PUSHPLUS }}
+        
+    - env:
+        SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         COOKIES: ${{ secrets.COOKIES }}
         GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
-
+        
     - name: 保持工作流运行
       run: |
         while true; do echo "保持工作流运行中"; sleep 600; done &
