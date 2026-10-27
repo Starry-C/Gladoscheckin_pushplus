@@ -35,8 +35,7 @@ jobs:
     - name: 运行 checkIn
       run: |
         python checkin.py
-        
-    - env:
+      env:
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         COOKIES: ${{ secrets.COOKIES }}
         GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
