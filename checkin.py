@@ -274,13 +274,18 @@ def serverchan(title, content):
     import html
 
     sendkey = os.environ.get(
-        "SERVERCHAN_SENDKEY",
-        ""
-    ).strip()
+    "SERVERCHAN_SENDKEY",
+    ""
+).strip()
 
-    if not sendkey:
-        print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
-        return
+print(
+    "方糖密钥读取状态：",
+    "已读取" if sendkey else "未读取"
+)
+
+if not sendkey:
+    print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
+    return
 
     # Server酱正文支持 Markdown，将原来的 HTML 转成纯文本
     content = re.sub(
