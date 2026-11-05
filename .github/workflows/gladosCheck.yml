@@ -1,3 +1,4 @@
+
 name: Auto Check
 
 on:
@@ -16,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: ['3.11']
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: 设置 Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -31,7 +32,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
 
-   
     - name: 运行 checkIn
       run: |
         python checkin.py
@@ -39,7 +39,7 @@ jobs:
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         COOKIES: ${{ secrets.COOKIES }}
         GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
-        
+
     - name: 保持工作流运行
       run: |
         while true; do echo "保持工作流运行中"; sleep 600; done &
