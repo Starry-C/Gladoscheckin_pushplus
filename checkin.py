@@ -1,4 +1,6 @@
+import hashlib
 import json
+import math
 import os
 import time
 import requests
@@ -7,7 +9,6 @@ from datetime import datetime
 
 # ============================================================
 # GLaDOS 多域名
-# Cookie 必须来自对应的实际登录域名
 # ============================================================
 
 DOMAINS = [
@@ -19,7 +20,6 @@ DOMAINS = [
     "glados.vip",
     "glados-facility.com",
 ]
-import os
 
 USER_AGENT = os.getenv("GLADOS_USER_AGENT", "").strip()
 
@@ -32,18 +32,22 @@ if not USER_AGENT:
         "Chrome/120.0.0.0 Safari/537.36"
     )
 
+
 # ============================================================
 # Cookie
 # ============================================================
 
 def get_cookies():
-    raw = os.environ.get("COOKIES", "").strip()
+    raw = (
+        os.environ.get("GLADOS_COOKIE", "").strip()
+        or os.environ.get("GLADOS_COOKIES", "").strip()
+        or os.environ.get("COOKIES", "").strip()
+    )
 
     if not raw:
-        print("❌ 没有读取到 COOKIES")
+        print("❌ 没有读取到 Cookie")
         return []
 
-    # 保留你原来的多账号格式：cookie1&cookie2
     return [x.strip() for x in raw.split("&") if x.strip()]
 
 
@@ -51,7 +55,7 @@ def get_cookies():
 # 请求
 # ============================================================
 
-def request(domain, cookie, method, path, data=None):
+def request(domain, cookie, method, path, data=None, log_response=True):
 
     url = f"https://{domain}{path}"
 
@@ -65,7 +69,6 @@ def request(domain, cookie, method, path, data=None):
     }
 
     try:
-
         if method == "POST":
             response = requests.post(
                 url,
@@ -85,8 +88,8 @@ def request(domain, cookie, method, path, data=None):
             f"HTTP {response.status_code}"
         )
 
-        # 不打印 Cookie，避免泄露
-        if response.text:
+        # 不打印 Cookie，也不打印 challenge 中的一次性 nonce
+        if log_response and response.text:
             print(
                 f"[{domain}] 返回: "
                 f"{response.text[:500]}"
@@ -95,11 +98,7 @@ def request(domain, cookie, method, path, data=None):
         return response
 
     except requests.RequestException as e:
-
-        print(
-            f"[{domain}] 请求失败: {repr(e)}"
-        )
-
+        print(f"[{domain}] 请求失败: {type(e).__name__}")
         return None
 
 
@@ -120,10 +119,7 @@ def find_valid_domain(cookie):
             "/api/user/status"
         )
 
-        if response is None:
-            continue
-
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             continue
 
         try:
@@ -138,14 +134,8 @@ def find_valid_domain(cookie):
             email = data.get("email")
 
             if email:
-
-                print(
-                    f"✅ Cookie 有效域名: {domain}"
-                )
-                print(
-                    f"   账号: {email}"
-                )
-
+                print(f"✅ Cookie 有效域名: {domain}")
+                print(f"   账号: {email}")
                 return domain, result
 
         print(
@@ -183,38 +173,77 @@ def get_status(domain, cookie):
     data = result.get("data")
 
     if not isinstance(data, dict):
-        print(
-            "⚠️ status 返回中没有 data 字段"
-        )
+        print("⚠️ status 返回中没有 data 字段")
         return result
 
     email = data.get("email", "未知账号")
     left_days = data.get("leftDays", "未知")
 
-    print(
-        f"📧 账号: {email}"
-    )
-    print(
-        f"⏳ 剩余: {left_days} 天"
-    )
+    print(f"📧 账号: {email}")
+    print(f"⏳ 剩余: {left_days} 天")
 
     return result
 
 
 # ============================================================
-# 签到
+# 签到：先获取 challenge，再提交验证
 # ============================================================
 
 def checkin(domain, cookie):
 
-    print(
-        f"\n🎫 开始签到: {domain}"
+    print(f"\n🎫 开始签到: {domain}")
+
+    # 第一步：获取一次性 challenge
+    challenge_response = request(
+        domain,
+        cookie,
+        "GET",
+        "/api/user/checkin/challenge",
+        log_response=False
     )
 
-    # 关键：
-    # token 必须与当前实际请求域名一致
+    if challenge_response is None:
+        return False, "获取签到验证失败：网络请求失败"
+
+    try:
+        challenge = challenge_response.json()
+    except ValueError:
+        return False, "获取签到验证失败：服务器返回非 JSON"
+
+    if not isinstance(challenge, dict):
+        return False, "获取签到验证失败：响应格式异常"
+
+    nonce = challenge.get("nonce")
+    ttl = challenge.get("ttl", 300000)
+
+    if (
+        challenge.get("code") != 0
+        or not isinstance(nonce, str)
+        or not 0 < len(nonce) <= 4096
+        or type(ttl) not in (int, float)
+        or not math.isfinite(ttl)
+        or ttl <= 2700
+    ):
+        return False, "获取签到验证失败：未取得有效 challenge，本次未提交签到"
+
+    # 第二步：计算验证 proof
+    received_at = time.monotonic()
+
+    proof = hashlib.sha256(
+        (nonce + ".glados-observe-v1").encode("utf-8")
+    ).hexdigest()
+
+    # 第三步：等待验证要求的时间
+    time.sleep(2.7)
+
+    if (time.monotonic() - received_at) * 1000 >= ttl:
+        return False, "签到验证已过期，本次未提交签到"
+
+    # 第四步：提交签到
     payload = {
-        "token": domain
+        "token": domain,
+        "nonce": nonce,
+        "proof": proof,
     }
 
     response = request(
@@ -231,21 +260,15 @@ def checkin(domain, cookie):
     try:
         result = response.json()
     except ValueError:
-
         return False, (
             f"服务器返回非 JSON: "
             f"{response.text[:200]}"
         )
 
-    message = str(
-        result.get("message", "")
-    )
-
+    message = str(result.get("message", ""))
     code = result.get("code")
-
     message_lower = message.lower()
 
-    # 新版 GLaDOS 常见成功/重复签到结果
     if (
         code == 0
         or "checkin" in message_lower
@@ -264,11 +287,9 @@ def checkin(domain, cookie):
     return False, message or f"签到失败，code={code}"
 
 
-
 # ============================================================
 # 方糖（Server酱）推送
 # ============================================================
-
 
 def serverchan(title, content):
     import re
@@ -288,7 +309,6 @@ def serverchan(title, content):
         print("ℹ️ 未配置 SERVERCHAN_SENDKEY，跳过推送")
         return
 
-    # 将 HTML 标签转换为纯文本
     content = re.sub(
         r"<br\s*/?>", "\n", content, flags=re.IGNORECASE
     )
@@ -300,9 +320,9 @@ def serverchan(title, content):
     )
     content = html.unescape(content).strip()
 
-    # 兼容 Server酱 Turbo（SCT）和 Server酱³（SC3）
     if sendkey.startswith("sctp"):
         match = re.match(r"^sctp(\d+)t", sendkey)
+
         if not match:
             print("❌ Server酱 SendKey 格式不正确")
             return
@@ -328,6 +348,7 @@ def serverchan(title, content):
 
         try:
             result = response.json()
+
             print(
                 "方糖推送结果:",
                 result.get("message", result.get("code", "未知"))
@@ -342,13 +363,15 @@ def serverchan(title, content):
             print("❌ 方糖返回的不是有效 JSON")
 
     except requests.RequestException as e:
-        print("❌ 方糖请求失败:", repr(e))
+        print("❌ 方糖请求失败:", type(e).__name__)
+
 
 # ============================================================
 # 主程序：自动签到并推送结果
 # ============================================================
 
 def main():
+
     cookies = get_cookies()
 
     if not cookies:
@@ -359,6 +382,7 @@ def main():
     messages = []
 
     for index, cookie in enumerate(cookies, start=1):
+
         print(f"\n========== 账号 {index} ==========")
 
         domain, status = find_valid_domain(cookie)
@@ -379,12 +403,17 @@ def main():
         if ok:
             success += 1
             messages.append(
-                f"账号：{email}\n域名：{domain}\n签到：成功（{message}）\n剩余：{left_days} 天"
+                f"账号：{email}\n"
+                f"域名：{domain}\n"
+                f"签到：成功（{message}）\n"
+                f"剩余：{left_days} 天"
             )
         else:
             fail += 1
             messages.append(
-                f"账号：{email}\n域名：{domain}\n签到：失败（{message}）"
+                f"账号：{email}\n"
+                f"域名：{domain}\n"
+                f"签到：失败（{message}）"
             )
 
     title = f"GLaDOS签到：成功 {success}，失败 {fail}"
@@ -398,4 +427,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
