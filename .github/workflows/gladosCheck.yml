@@ -9,6 +9,11 @@ on:
         required: false
         type: boolean
         default: false
+      check_status_only:
+        description: '只读验证登录状态，不执行签到'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths-ignore:
@@ -46,6 +51,7 @@ jobs:
         GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
         GLADOS_USER_AGENT: ${{ secrets.GLADOS_USER_AGENT }}
         CHECK_COOKIE_ONLY: ${{ inputs.check_cookie_only && '1' || '0' }}
+        CHECK_STATUS_ONLY: ${{ inputs.check_status_only && '1' || '0' }}
         EXCHANGE_PLAN: off
         PUSH_LEVEL: always
 
