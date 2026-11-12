@@ -37,8 +37,10 @@ jobs:
         python checkin.py
       env:
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
-        COOKIES: ${{ secrets.COOKIES }}
-        GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
+        GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
+        GLADOS_USER_AGENT: ${{ secrets.GLADOS_USER_AGENT }}
+        EXCHANGE_PLAN: off
+        PUSH_LEVEL: always
 
     - name: 保持工作流运行
       run: |
