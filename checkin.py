@@ -2,6 +2,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import time
 import requests
 from datetime import datetime
@@ -54,6 +55,36 @@ def get_cookies():
 # ============================================================
 # 请求
 # ============================================================
+def get_browser_headers():
+    ua = os.getenv("GLADOS_USER_AGENT", "").strip()
+    match = re.search(r"(?:Chrome|Chromium)/(\d+)", ua)
+    if not match:
+        return {}
+
+    version = match.group(1)
+
+    if "Macintosh" in ua:
+        platform = "macOS"
+    elif "Windows" in ua:
+        platform = "Windows"
+    elif "Android" in ua:
+        platform = "Android"
+    elif "Linux" in ua:
+        platform = "Linux"
+    else:
+        platform = "Unknown"
+
+    mobile = "?1" if "Android" in ua else "?0"
+
+    return {
+        "Sec-CH-UA": (
+            f'"Chromium";v="{version}", '
+            f'"Google Chrome";v="{version}", '
+            '"Not_A Brand";v="99"'
+        ),
+        "Sec-CH-UA-Mobile": mobile,
+        "Sec-CH-UA-Platform": f'"{platform}"',
+    }
 
 def request(domain, cookie, method, path, data=None, log_response=True):
 
@@ -67,6 +98,13 @@ def request(domain, cookie, method, path, data=None, log_response=True):
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json;charset=UTF-8",
     }
+    headers.update(get_browser_headers())
+    headers.update({
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+    })
 
     try:
         if method == "POST":
