@@ -3,6 +3,12 @@ name: Auto Check
 
 on:
   workflow_dispatch:
+    inputs:
+      check_cookie_only:
+        description: '仅检查 Cookie，不执行签到'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths-ignore:
@@ -39,6 +45,7 @@ jobs:
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
         GLADOS_USER_AGENT: ${{ secrets.GLADOS_USER_AGENT }}
+        CHECK_COOKIE_ONLY: ${{ inputs.check_cookie_only && '1' || '0' }}
         EXCHANGE_PLAN: off
         PUSH_LEVEL: always
 
