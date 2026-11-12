@@ -449,9 +449,32 @@ def main():
                 print("✅ 登录状态验证通过")
                 print(f"识别域名：{domain}")
                 print(f"剩余天数：{data.get('leftDays', '未知')}")
+                response = request(
+                    domain,
+                    cookie,
+                    "GET",
+                    "/api/user/points",
+                    log_response=False
+                )
+
+                if response is not None and response.status_code == 200:
+                    try:
+                        result = response.json()
+                        if isinstance(result, dict) and "points" in result:
+                            print(f"当前总积分：{result.get('points')}")
+                            history = result.get("history", [])
+                            if isinstance(history, list) and history:
+                                print(f"最近一笔积分变动：{history[0].get('change', '未知')}")
+                            else:
+                                print("没有可读取的积分流水")
+                        else:
+                            print("积分接口未返回 points 字段")
+                    except ValueError:
+                        print("积分接口返回格式异常")
+                else:
+                    print("积分接口请求失败")
             else:
                 print("❌ 未能通过账户状态验证")
-
         print("\n🔒 只读验证结束：没有获取 challenge，没有提交签到")
         return
 
