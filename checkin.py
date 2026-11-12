@@ -396,6 +396,27 @@ def main():
         print("检测到的 Cookie 名称：" + ", ".join(names))
         print("🔒 本次没有访问 GLaDOS，也没有执行签到")
         return
+
+    if os.environ.get("CHECK_STATUS_ONLY", "").strip() == "1":
+        cookies = get_cookies()
+        if not cookies:
+            return
+
+        print("\n🔎 只读验证登录状态：仅请求 /api/user/status")
+        for index, cookie in enumerate(cookies, start=1):
+            print(f"\n========== 账号 {index} ==========")
+            domain, status = find_valid_domain(cookie)
+            if domain and status:
+                data = status.get("data", {})
+                print("✅ 登录状态验证通过")
+                print(f"识别域名：{domain}")
+                print(f"剩余天数：{data.get('leftDays', '未知')}")
+            else:
+                print("❌ 未能通过账户状态验证")
+
+        print("\n🔒 只读验证结束：没有获取 challenge，没有提交签到")
+        return
+
     cookies = get_cookies()
 
     if not cookies:
