@@ -48,7 +48,7 @@ def get_cookies():
         print("❌ 没有读取到 Cookie")
         return []
 
-    return [x.strip() for x in raw.split("&") if x.strip()]
+    return [raw]
 
 
 # ============================================================
@@ -372,6 +372,30 @@ def serverchan(title, content):
 
 def main():
 
+    if os.environ.get("CHECK_COOKIE_ONLY", "").strip() == "1":
+        raw = (
+            os.environ.get("GLADOS_COOKIE", "").strip()
+            or os.environ.get("GLADOS_COOKIES", "").strip()
+            or os.environ.get("COOKIES", "").strip()
+        )
+
+        if not raw:
+            print("❌ Cookie Secret 未注入（变量为空）")
+            return
+
+        names = []
+        for item in raw.split(";"):
+            item = item.strip()
+            if "=" in item:
+                name = item.split("=", 1)[0].strip()
+                if name and name not in names:
+                    names.append(name)
+
+        print("✅ Cookie Secret 已注入")
+        print(f"Cookie 字符数：{len(raw)}")
+        print("检测到的 Cookie 名称：" + ", ".join(names))
+        print("🔒 本次没有访问 GLaDOS，也没有执行签到")
+        return
     cookies = get_cookies()
 
     if not cookies:
