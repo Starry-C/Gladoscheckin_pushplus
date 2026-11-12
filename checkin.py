@@ -466,7 +466,9 @@ def main():
                             if isinstance(history, list) and history and isinstance(history[0], dict):
                                 last = history[0]
                                 print(f"最近一笔积分变动：{last.get('change', '未知')}")
-                                print("最近一笔流水字段：" + ", ".join(sorted(last.keys())))
+                                print(f"积分业务类型：{last.get('business', '未知')}")
+                                print(f"积分变动说明：{str(last.get('detail', '未知'))[:120]}")
+                                print(f"积分记录时间：{last.get('time', '未知')}")
                             else:
                                 print("没有可读取的积分流水")
                         else:
