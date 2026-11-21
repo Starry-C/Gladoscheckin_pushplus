@@ -304,20 +304,19 @@ def checkin(domain, cookie):
         )
 
     message = str(result.get("message", ""))
-code = result.get("code")
-repeated = result.get("repeated") is True
+    code = result.get("code")
+    repeated = result.get("repeated") is True
 
-if code == 0 and not repeated:
-    points = result.get("points")
-    if points is not None:
-        return True, f"签到成功，获得 {points} 积分"
-    return True, message or "签到成功（服务器返回 code=0）"
+    if code == 0 and not repeated:
+        points = result.get("points")
+        if points is not None:
+            return True, f"签到成功，获得 {points} 积分"
+        return True, message or "签到成功（服务器返回 code=0）"
 
-if code == 1 or repeated:
-    return False, "今日已签到，本次没有新增积分"
+    if code == 1 or repeated:
+        return False, "今日已签到，本次没有新增积分"
 
-return False, message or f"签到失败，code={code}"
-
+    return False, message or f"签到失败，code={code}"
 
 # ============================================================
 # 方糖（Server酱）推送
