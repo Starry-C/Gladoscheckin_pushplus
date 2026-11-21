@@ -49,7 +49,7 @@ jobs:
       env:
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
-        GLADOS_USER_AGENT: ${{ secrets.GLADOS_USER_AGENT }}
+        GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
         CHECK_COOKIE_ONLY: ${{ inputs.check_cookie_only && '1' || '0' }}
         CHECK_STATUS_ONLY: ${{ inputs.check_status_only && '1' || '0' }}
         EXCHANGE_PLAN: off
