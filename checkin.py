@@ -1,3 +1,4 @@
+
 import hashlib
 import json
 import math
@@ -55,8 +56,9 @@ def get_cookies():
 # ============================================================
 # 请求
 # ============================================================
-def get_browser_headers():
-    ua = os.getenv("GLADOS_USER_AGENT", "").strip()
+
+def get_browser_headers(user_agent=None):
+    ua = (user_agent or USER_AGENT).strip()
     match = re.search(r"(?:Chrome|Chromium)/(\d+)", ua)
     if not match:
         return {}
@@ -86,19 +88,21 @@ def get_browser_headers():
         "Sec-CH-UA-Platform": f'"{platform}"',
     }
 
-def request(domain, cookie, method, path, data=None, log_response=True):
+
+def request(domain, cookie, method, path, data=None,
+            log_response=True, user_agent=None):
 
     url = f"https://{domain}{path}"
+    ua = (user_agent or USER_AGENT).strip()
 
     headers = {
         "Cookie": cookie,
         "Origin": f"https://{domain}",
-        "Referer": f"https://{domain}/console/checkin",
-        "User-Agent": USER_AGENT,
+        "User-Agent": ua,
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json;charset=UTF-8",
     }
-    headers.update(get_browser_headers())
+    headers.update(get_browser_headers(ua))
     headers.update({
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         "Sec-Fetch-Dest": "empty",
@@ -231,77 +235,148 @@ def checkin(domain, cookie):
 
     print(f"\n🎫 开始签到: {domain}")
 
-    # 第一步：获取一次性 challenge
-    challenge_response = request(
-        domain,
-        cookie,
-        "GET",
-        "/api/user/checkin/challenge",
-        log_response=False
-    )
-
-    if challenge_response is None:
-        return False, "获取签到验证失败：网络请求失败"
-
-    try:
-        challenge = challenge_response.json()
-    except ValueError:
-        return False, "获取签到验证失败：服务器返回非 JSON"
-
-    if not isinstance(challenge, dict):
-        return False, "获取签到验证失败：响应格式异常"
-
-    nonce = challenge.get("nonce")
-    ttl = challenge.get("ttl", 300000)
-
-    if (
-        challenge.get("code") != 0
-        or not isinstance(nonce, str)
-        or not 0 < len(nonce) <= 4096
-        or type(ttl) not in (int, float)
-        or not math.isfinite(ttl)
-        or ttl <= 2700
-    ):
-        return False, "获取签到验证失败：未取得有效 challenge，本次未提交签到"
-
-    # 第二步：计算验证 proof
-    received_at = time.monotonic()
-
-    proof = hashlib.sha256(
-        (nonce + ".glados-observe-v1").encode("utf-8")
-    ).hexdigest()
-
-    # 第三步：等待验证要求的时间
-    time.sleep(2.7)
-
-    if (time.monotonic() - received_at) * 1000 >= ttl:
-        return False, "签到验证已过期，本次未提交签到"
-
-    # 第四步：提交签到
-    payload = {
-        "token": domain,
-        "nonce": nonce,
-        "proof": proof,
+    platform_ua = {
+        "Windows": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "macOS": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/152.0.0.0 Safari/537.36"
+        ),
+        "Linux": (
+            "Mozilla/5.0 (X11; Linux x86_64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "iOS": (
+            "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.0 Mobile/15E148 Safari/604.1"
+        ),
+        "iPhone": (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.0 Mobile/15E148 Safari/604.1"
+        ),
+        "iPad": (
+            "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.0 Mobile/15E148 Safari/604.1"
+        ),
+        "Android": (
+            "Mozilla/5.0 (Linux; Android 13; Pixel 7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Mobile Safari/537.36"
+        ),
     }
 
-    response = request(
-        domain,
-        cookie,
-        "POST",
-        "/api/user/checkin",
-        payload
-    )
-
-    if response is None:
-        return False, "网络请求失败"
-
-    try:
-        result = response.json()
-    except ValueError:
-        return False, (
-            f"服务器返回非 JSON: "
-            f"{response.text[:200]}"
+    def submit_once(ua):
+        challenge_response = request(
+            domain,
+            cookie,
+            "GET",
+            "/api/user/checkin/challenge",
+            log_response=False,
+            user_agent=ua
         )
+
+        if challenge_response is None:
+            return None, "获取签到验证失败：网络请求失败"
+
+        try:
+            challenge = challenge_response.json()
+        except ValueError:
+            return None, "获取签到验证失败：服务器返回非 JSON"
+
+        if not isinstance(challenge, dict):
+            return None, "获取签到验证失败：响应格式异常"
+
+        nonce = challenge.get("nonce")
+        ttl = challenge.get("ttl", 300000)
+
+        if (
+            challenge.get("code") != 0
+            or not isinstance(nonce, str)
+            or not 0 < len(nonce) <= 4096
+            or type(ttl) not in (int, float)
+            or not math.isfinite(ttl)
+            or ttl <= 2700
+        ):
+            return None, "获取签到验证失败：未取得有效 challenge，本次未提交签到"
+
+        received_at = time.monotonic()
+        proof = hashlib.sha256(
+            (nonce + ".glados-observe-v1").encode("utf-8")
+        ).hexdigest()
+
+        time.sleep(2.7)
+
+        if (time.monotonic() - received_at) * 1000 >= ttl:
+            return None, "签到验证已过期，本次未提交签到"
+
+        payload = {
+            "token": domain,
+            "nonce": nonce,
+            "proof": proof,
+        }
+
+        response = request(
+            domain,
+            cookie,
+            "POST",
+            "/api/user/checkin",
+            payload,
+            user_agent=ua
+        )
+
+        if response is None:
+            return None, "网络请求失败"
+
+        try:
+            result = response.json()
+        except ValueError:
+            return None, (
+                f"服务器返回非 JSON: "
+                f"{response.text[:200]}"
+            )
+
+        if not isinstance(result, dict):
+            return None, "服务器签到响应格式异常"
+
+        return result, None
+
+    # 首次使用仓库现有的 GLADOS_USER_AGENT
+    result, error = submit_once(USER_AGENT)
+
+    if error:
+        return False, error
+
+    # 仅在服务器明确报告设备平台不匹配时重试一次
+    if (
+        result.get("code") == 4
+        and result.get("reason") == "device-mismatch"
+    ):
+        device = result.get("loginDevice")
+        retry_ua = platform_ua.get(device)
+
+        if not retry_ua:
+            return False, (
+                f"设备平台不匹配；服务器返回 loginDevice={device!r}，"
+                "没有对应的自动重试配置"
+            )
+
+        print(
+            f"⚠️ 设备平台不匹配，服务器识别平台为 {device}；"
+            "重新获取 challenge 后重试一次"
+        )
+
+        result, error = submit_once(retry_ua)
+
+        if error:
+            return False, error
 
     message = str(result.get("message", ""))
     code = result.get("code")
@@ -317,6 +392,7 @@ def checkin(domain, cookie):
         return False, "今日已签到，本次没有新增积分"
 
     return False, message or f"签到失败，code={code}"
+
 
 # ============================================================
 # 方糖（Server酱）推送
