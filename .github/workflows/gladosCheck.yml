@@ -1,69 +1,57 @@
-
 name: Auto Check
 
 on:
+  # 每天 UTC 00:00 运行，即台湾时间 08:00
+  schedule:
+    - cron: '0 0 * * *'
+
+  # 仅供人工触发只读检查；默认不执行真实签到
   workflow_dispatch:
     inputs:
       check_cookie_only:
-        description: '仅检查 Cookie，不执行签到'
+        description: '仅检查 Cookie 是否注入，不访问 GLaDOS'
         required: false
         type: boolean
         default: false
       check_status_only:
-        description: '只读验证登录状态，不执行签到'
+        description: '只读检查登录状态和积分流水，不执行签到'
         required: false
         type: boolean
         default: false
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'imgs/'
-  schedule:
-    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+
+# 防止定时任务与手动运行同时执行
+concurrency:
+  group: glados-checkin
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Glados checkin
+    name: GLaDOS check-in
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11']
+    timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v4
+      - name: 获取仓库代码
+        uses: actions/checkout@v4
 
-    - name: 设置 Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: 安装依赖
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
 
-    - name: 运行 checkIn
-      run: |
-        python checkin.py
-      env:
-        SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
-        GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
-        GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
-        CHECK_COOKIE_ONLY: ${{ inputs.check_cookie_only && '1' || '0' }}
-        CHECK_STATUS_ONLY: ${{ inputs.check_status_only && '1' || '0' }}
-        EXCHANGE_PLAN: off
-        PUSH_LEVEL: always
-
-    - name: 保持工作流运行
-      run: |
-        while true; do echo "保持工作流运行中"; sleep 600; done &
-
-    - name: 删除工作流运行记录
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        token: ${{ github.token }}
-        repository: ${{ github.repository }}
-        retain_days: 0
-        keep_minimum_runs: 10
-        delete_run_by_conclusion_pattern: success
+      - name: 执行签到或只读检查
+        run: python checkin.py
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIES }}
+          GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
+          CHECK_COOKIE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_cookie_only && '1' || '0' }}
+          CHECK_STATUS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_status_only && '1' || '0' }}
